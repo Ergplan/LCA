@@ -1,0 +1,38 @@
+<body>
+<div class="app" id="app">
+  <aside class="side" id="side" aria-label="Modules">
+    <div class="brand"><span class="brand-mark">◢</span> LCA Workbench</div>
+    <div class="rft-chip">
+      <span class="eyebrow">Workspace</span>
+      <b>Coastal Refinery <span class="muted" style="font-weight:500">(sample)</span></b>
+      <span class="muted" id="subLabel">Subscription month 36 of 36</span>
+      <div class="prog" aria-hidden="true"><i id="prog" style="width:0"></i></div>
+    </div>
+    <nav class="nav" id="nav"></nav>
+    <div class="side-foot">
+      <label class="rfp-toggle"><input type="checkbox" id="rfpToggle"> <span>Requirements map: tag each screen with the tender criteria and requirement IDs it covers</span></label>
+      <p style="margin-top:8px">Demo for RFT 6000151329. All figures are illustrative sample data. Charts: Strata Charts v1.1.1.</p>
+    </div>
+  </aside>
+  <div class="main">
+    <header class="top">
+      <button class="pill menu-btn" id="menu" aria-label="Open menu">☰</button>
+      <div class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Search modules, units, products…" aria-label="Search" list="searchList"><datalist id="searchList"></datalist></div>
+      <div class="top-tools">
+        <div class="seg" role="group" aria-label="Reporting year" id="yearSeg">
+          <button data-year="1">2027</button><button data-year="2">2028</button><button data-year="3">2029</button>
+        </div>
+        <div class="seg" role="group" aria-label="Theme" id="palSeg">
+          <button data-pal="mono" aria-pressed="true">Mono</button><button data-pal="mint">Mint</button><button data-pal="sand">Sand</button>
+        </div>
+        <button class="pill is-ink" id="tourBtn">▶ Tour</button>
+        <button class="pill" id="modeBtn" aria-pressed="false">◐ Dark</button>
+        <button class="icon-btn" id="bell" aria-label="Notifications">🔔<span class="bell-n" id="bellN">3</span></button>
+        <span class="ava" title="Signed in: Sustainability manager">SM</span>
+      </div>
+    </header>
+    <main class="view" id="view" tabindex="-1"></main>
+  </div>
+</div>
+<div class="tour-ring" id="tourRing" hidden></div><div class="tour-pop" id="tourPop" hidden role="dialog" aria-label="Guided tour"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
