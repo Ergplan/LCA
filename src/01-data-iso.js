@@ -171,8 +171,15 @@ function pcf({ year = 3, alloc = 'energy', bound = 'c2g', fu = 't', override = n
 /* =====================================================================
    Isometric refinery landscape (SVG)
    ===================================================================== */
-const S = 13, CO = 0.8660254, OX = 372, OY = 176;
-const P = (x, y, z = 0) => [OX + (x - y) * CO * S, OY + (x + y) * 0.5 * S - z * S];
+const S = 13, CO = 0.8660254, OX = 600, OY = 150;
+// K spreads the site: unit centres, roads, pipes and vehicle paths move apart by K; each unit keeps its own size.
+const K = 1.6;
+let SH = [0, 0];
+const P = (x, y, z = 0) => { const X = x + SH[0], Y = y + SH[1]; return [OX + (X - Y) * CO * S, OY + (X + Y) * 0.5 * S - z * S]; };
+function withShift(sh, fn) { const s = SH; SH = sh; try { return fn(); } finally { SH = s; } }
+const PW = (x, y, z = 0) => withShift([0, 0], () => P(x * K, y * K, z));
+const assetShift = (id) => { const a = ASSETS[id].pad; return [(a[0] + a[2] / 2) * (K - 1), (a[1] + a[3] / 2) * (K - 1)]; };
+const PA = (id, x, y, z = 0) => withShift(assetShift(id), () => P(x, y, z));
 const pts = (a) => a.map((p) => p.map((n) => n.toFixed(1)).join(',')).join(' ');
 const poly = (a, fill, extra = '') => `<polygon points="${pts(a)}" fill="${fill}" stroke="var(--iso-edge)" stroke-width=".6" stroke-linejoin="round" ${extra}/>`;
 function box(x, y, z, w, d, h, o = {}) {
@@ -228,22 +235,22 @@ const ASSETS = {
 function landscapeSVG() {
   const g = [];
   // sea + ground slab
-  g.push(`<polygon points="${pts([P(38, -2, -0.9), P(52, -2, -0.9), P(52, 32, -0.9), P(38, 32, -0.9)])}" fill="var(--sea)"/>`);
-  for (let i = 0; i < 9; i++) { const a = P(40 + i * 1.4, 2 + (i % 3) * 8), b = P(41 + i * 1.4, 2 + (i % 3) * 8); g.push(`<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="var(--sea2)" stroke-width="1.4" stroke-linecap="round"/>`); }
-  g.push(poly([P(0, 30, 0), P(38, 30, 0), P(38, 30, -0.9), P(0, 30, -0.9)], 'var(--iso-l)'));
-  g.push(poly([P(38, 0, 0), P(38, 30, 0), P(38, 30, -0.9), P(38, 0, -0.9)], 'var(--iso-r)'));
-  g.push(poly([P(0, 0, 0), P(38, 0, 0), P(38, 30, 0), P(0, 30, 0)], 'var(--iso-ground)'));
+  g.push(`<polygon points="${pts([PW(38, -2, -0.9), PW(52, -2, -0.9), PW(52, 32, -0.9), PW(38, 32, -0.9)])}" fill="var(--sea)"/>`);
+  for (let i = 0; i < 9; i++) { const a = PW(40 + i * 1.4, 2 + (i % 3) * 8), b = PW(41 + i * 1.4, 2 + (i % 3) * 8); g.push(`<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="var(--sea2)" stroke-width="1.4" stroke-linecap="round"/>`); }
+  g.push(poly([PW(0, 30, 0), PW(38, 30, 0), PW(38, 30, -0.9), PW(0, 30, -0.9)], 'var(--iso-l)'));
+  g.push(poly([PW(38, 0, 0), PW(38, 30, 0), PW(38, 30, -0.9), PW(38, 0, -0.9)], 'var(--iso-r)'));
+  g.push(poly([PW(0, 0, 0), PW(38, 0, 0), PW(38, 30, 0), PW(0, 30, 0)], 'var(--iso-ground)'));
   // roads
-  [[[0, 9.6], [38, 9.6]], [[0, 19.8], [38, 19.8]], [[12.6, 0], [12.6, 30]], [[32.6, 0], [32.6, 30]], [[-4, 29.3], [32.6, 29.3]]].forEach((r) => g.push(`<polyline points="${pts(r.map(([x, y]) => P(x, y)))}" fill="none" stroke="var(--road)" stroke-width="7" stroke-linecap="round"/>`));
+  [[[0, 9.6], [38, 9.6]], [[0, 19.8], [38, 19.8]], [[12.6, 0], [12.6, 30]], [[32.6, 0], [32.6, 30]], [[-4, 29.3], [32.6, 29.3]]].forEach((r) => g.push(`<polyline points="${pts(r.map(([x, y]) => PW(x, y)))}" fill="none" stroke="var(--road)" stroke-width="7" stroke-linecap="round"/>`));
   // pads
-  Object.entries(ASSETS).forEach(([id, a]) => g.push(`<polygon class="asset-pad" data-cp="${id}" points="${pts(pad(...a.pad))}" fill="var(--iso-pad)" stroke="var(--line2)" stroke-width=".8"/>`));
+  Object.entries(ASSETS).forEach(([id, a]) => g.push(`<polygon class="asset-pad" data-cp="${id}" points="${pts(withShift(assetShift(id), () => pad(...a.pad)))}" fill="var(--iso-pad)" stroke="var(--line2)" stroke-width=".8"/>`));
   // flows
   g.push(pipesSVG());
   // labels on the ground
-  const lab = (x, y, t) => { const [a, b] = P(x, y); return `<text class="lbl" paint-order="stroke" stroke="var(--iso-ground)" stroke-width="3" x="${a.toFixed(0)}" y="${b.toFixed(0)}" text-anchor="middle">${t}</text>`; };
+  const lab = (x, y, t) => { const [a, b] = PW(x, y); return `<text class="lbl" paint-order="stroke" stroke="var(--iso-ground)" stroke-width="3" x="${a.toFixed(0)}" y="${b.toFixed(0)}" text-anchor="middle">${t}</text>`; };
   // assets in painter order
   const order = Object.entries(ASSETS).sort((a, b) => (a[1].pad[0] + a[1].pad[2] / 2 + a[1].pad[1] + a[1].pad[3] / 2) - (b[1].pad[0] + b[1].pad[2] / 2 + b[1].pad[1] + b[1].pad[3] / 2));
-  order.forEach(([id, a]) => g.push(`<g class="asset" data-cp="${id}">${a.draw()}</g>`));
+  order.forEach(([id, a]) => g.push(`<g class="asset" data-cp="${id}">${withShift(assetShift(id), a.draw)}</g>`));
   g.push(lab(-2.6, 3.6, 'From upstream fields'), lab(5.2, 9.2, 'Crude tank farm'), lab(30, 7.4, 'Process units'), lab(1.6, 19.6, 'Utilities'), lab(6, 30.4, 'Solar PV & substation'), lab(30.4, 22.6, 'Product tanks'), lab(46, 27, 'Arabian Gulf'), lab(40.5, 16.2, 'Export jetty'));
-  return `<svg class="iso" viewBox="24 92 900 584" role="img" aria-label="Isometric view of the refinery with 18 data collection points">${g.join('')}<g class="leaders"></g><g class="vehs"></g></svg>`;
+  return `<svg class="iso" viewBox="${VB.join(' ')}" role="img" aria-label="Isometric view of the refinery with 18 data collection points">${g.join('')}<g class="leaders"></g><g class="vehs"></g></svg>`;
 }

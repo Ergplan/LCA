@@ -2,7 +2,7 @@
 /* =====================================================================
    Live map: glass label cards, moving vehicles, inventory, control centre
    ===================================================================== */
-const VB = [24, 92, 900, 584]; // must match the iso viewBox
+const VB = [-20, 40, 1340, 850]; // iso viewBox; overlay cards are placed in % of it
 const toPct = ([sx, sy]) => [((sx - VB[0]) / VB[2]) * 100, ((sy - VB[1]) / VB[3]) * 100];
 const VEHICLES = [
   { id: 'TRK-14', kind: 'truck', what: 'Diesel to depot', co2: 0.31, unit: 't CO₂e/trip', path: [[26, 29.3], [-4, 29.3]], speed: 1.6 },
@@ -11,8 +11,8 @@ const VEHICLES = [
   { id: 'MT-Crude', kind: 'ship', what: 'Crude tanker, inbound', co2: 38, unit: 't CO₂e/day', path: [[53, 1], [45, 9]], speed: 0.35, pingpong: true },
 ];
 const STOCK = [
-  { id: 'INV-C', name: 'Crude stock', at: [10, 6.6, 2.2], cap: 620, lvl: (m) => 0.66 + 0.16 * Math.sin(m * 1.3), ef: (y) => yearTotal(CPI['01'], y) / (sum(PRODUCTS.map((p) => p.kt)) * 1000) },
-  { id: 'INV-P', name: 'Product stock', at: [28, 20.6, 2.4], cap: 380, lvl: (m) => 0.58 + 0.2 * Math.sin(m * 0.9 + 1), ef: (y) => siteYear(y) / (sum(PRODUCTS.map((p) => p.kt)) * 1000) },
+  { id: 'INV-C', cp: '02', name: 'Crude stock', at: [10, 6.6, 2.2], cap: 620, lvl: (m) => 0.66 + 0.16 * Math.sin(m * 1.3), ef: (y) => yearTotal(CPI['01'], y) / (sum(PRODUCTS.map((p) => p.kt)) * 1000) },
+  { id: 'INV-P', cp: '14', name: 'Product stock', at: [28, 20.6, 2.4], cap: 380, lvl: (m) => 0.58 + 0.2 * Math.sin(m * 0.9 + 1), ef: (y) => siteYear(y) / (sum(PRODUCTS.map((p) => p.kt)) * 1000) },
 ];
 const stockNow = (s, m = state.month) => { const lv = clamp(s.lvl(m), 0.1, 0.97); const kt = s.cap * lv; return { lv, kt, co2: kt * 1000 * s.ef(yearOf(m)) }; };
 
@@ -33,8 +33,8 @@ const PIPES = [
 ];
 function pipesSVG() {
   return '<g aria-hidden="true">' + PIPES.map((p) => {
-    const pts3 = pts(p.path.map(([x, y]) => P(x, y, 0.35)));
-    const sup = p.path.map(([x, y]) => { const a = P(x, y, 0), b = P(x, y, 0.35); return `<line x1="${a[0].toFixed(1)}" y1="${a[1].toFixed(1)}" x2="${b[0].toFixed(1)}" y2="${b[1].toFixed(1)}" stroke="var(--iso-edge)" stroke-width="1.2"/>`; }).join('');
+    const pts3 = pts(p.path.map(([x, y]) => PW(x, y, 0.35)));
+    const sup = p.path.map(([x, y]) => { const a = PW(x, y, 0), b = PW(x, y, 0.35); return `<line x1="${a[0].toFixed(1)}" y1="${a[1].toFixed(1)}" x2="${b[0].toFixed(1)}" y2="${b[1].toFixed(1)}" stroke="var(--iso-edge)" stroke-width="1.2"/>`; }).join('');
     return `<g data-pl="${p.id}">${sup}<polyline class="pipe-body" points="${pts3}"/><polyline class="pipe-flow" points="${pts3}" style="stroke:${PCOL[p.col]}"/></g>`;
   }).join('') + '</g>';
 }
@@ -48,18 +48,21 @@ function pipeMid(p) {
 
 function mapHTML(id, compact = false) {
   return `<div class="map${compact ? ' compact' : ''}" id="${id}">
-    <div class="map-ctl seg" role="group" aria-label="Labels">${[['all', 'All labels'], ['units', 'Units'], ['moving', 'Flows & stock'], ['off', 'Off']].map(([k, l]) => `<button data-lab="${k}">${l}</button>`).join('')}</div>
-    ${landscapeSVG()}<div class="ov"></div></div>`;
+    <div class="map-top"><div class="map-ctl seg" role="group" aria-label="Labels">${[['all', 'All labels'], ['units', 'Units'], ['moving', 'Flows & stock'], ['off', 'Off']].map(([k, l]) => `<button data-lab="${k}">${l}</button>`).join('')}</div><button class="pill map-full" data-full aria-pressed="false">⤢ Full screen</button></div>
+    <div class="map-stage">${landscapeSVG()}<div class="ov"></div><div class="pop-layer"></div></div></div>`;
 }
 function mountMap(root) {
   if (!root) return;
   root.addEventListener('click', (e) => {
+    if (e.target.closest('[data-full]')) { toggleFull(root); return; }
+    if (e.target.closest('[data-popx]')) { state.bld = null; root.querySelector('.pop-layer').innerHTML = ''; return; }
+    if (e.target.closest('.bld-pop')) { const go = e.target.closest('[data-popgo]'); if (go) { exitFull(); state.cp = go.dataset.popgo; goto('site'); } return; }
     const lab = e.target.closest('[data-lab]'); if (lab) { state.labels = lab.dataset.lab; store.set('labels', state.labels); drawPins(); return; }
     const v = e.target.closest('[data-veh]'); if (v) { const x = VEHICLES.find((q) => q.id === v.dataset.veh); toast(`${x.id} · ${x.what} · ${x.co2} ${x.unit}`); return; }
     const pp = e.target.closest('[data-pipe]'); if (pp) { const x = PIPES.find((q) => q.id === pp.dataset.pipe); if (PIPE_PROD[x.id]) { state.prod = PIPE_PROD[x.id]; state.vcStage = null; goto('products'); return; } toast(`${x.id} ${x.name} · ${x.rate} · ${x.ci()}`); return; }
     const s = e.target.closest('[data-stock]'); if (s) { goto('inventory'); return; }
     const g = e.target.closest('[data-cp]'); if (!g) return;
-    if (g.dataset.cp === 'cc') goto('control'); else selectCP(g.dataset.cp);
+    if (g.dataset.cp === 'cc') { exitFull(); goto('control'); } else { selectCP(g.dataset.cp); showBld(root, g.dataset.cp); }
   });
   ensureAnim();
 }
@@ -69,7 +72,7 @@ function drawMap(root) {
   let lines = '', cards = '';
   CPS.forEach((c) => {
     const [px, py, pz] = ASSETS[c.id].pin;
-    const a = P(px, py, pz), b = P(px, py, pz + 2.2);
+    const a = PA(c.id, px, py, pz), b = PA(c.id, px, py, pz + 2.2);
     lines += `<line x1="${a[0].toFixed(1)}" y1="${a[1].toFixed(1)}" x2="${b[0].toFixed(1)}" y2="${b[1].toFixed(1)}" stroke="var(--ink)" stroke-opacity=".45"/><circle cx="${a[0].toFixed(1)}" cy="${a[1].toFixed(1)}" r="2" fill="var(--ink)"/>`;
     if (lab === 'off' || lab === 'moving') {
       lines += `<circle class="cp-dot" data-cp="${c.id}" cx="${b[0].toFixed(1)}" cy="${b[1].toFixed(1)}" r="5" fill="${pinStyle(c, m).fill}" stroke="var(--ink)" stroke-width="${c.id === state.cp ? 2 : .6}" style="cursor:pointer"/>`;
@@ -86,16 +89,16 @@ function drawMap(root) {
   });
   if (lab === 'all' || lab === 'moving') {
     STOCK.forEach((s) => {
-      const n = stockNow(s, m), [l, t] = toPct(P(...s.at));
-      cards += `<button class="gl stock" data-stock="${s.id}" style="left:${l.toFixed(2)}%;top:${t.toFixed(2)}%;z-index:${Math.round(P(...s.at)[1])}"><span class="gl-top"><span class="gl-ico">▤</span><b>${s.name}</b><span class="nm">${pct(n.lv)}</span></span><span class="gl-bar"><i style="width:${n.lv * 100}%;background:var(--ink)"></i></span><span class="v">${fmtN(n.kt)} kt · ${fmtT(n.co2)} CO₂e embodied</span></button>`;
+      const n = stockNow(s, m), sp = PA(s.cp, ...s.at), [l, t] = toPct(sp);
+      cards += `<button class="gl stock" data-stock="${s.id}" style="left:${l.toFixed(2)}%;top:${t.toFixed(2)}%;z-index:${Math.round(sp[1])}"><span class="gl-top"><span class="gl-ico">▤</span><b>${s.name}</b><span class="nm">${pct(n.lv)}</span></span><span class="gl-bar"><i style="width:${n.lv * 100}%;background:var(--ink)"></i></span><span class="v">${fmtN(n.kt)} kt · ${fmtT(n.co2)} CO₂e embodied</span></button>`;
     });
     PIPES.forEach((p) => {
-      const [x, y] = pipeMid(p), s = P(x, y, 0.9), [l, t] = toPct(s);
+      const [x, y] = pipeMid(p), s = PW(x, y, 0.9), [l, t] = toPct(s);
       cards += `<button class="gl pipe" data-pipe="${p.id}" style="left:${l.toFixed(2)}%;top:${t.toFixed(2)}%;z-index:${Math.round(s[1])};--pc:${PCOL[p.col]}"><span class="gl-top"><i class="pipe-sw"></i><b>${p.name}</b></span><span class="v">${p.rate} · ${p.ci()}</span></button>`;
     });
     VEHICLES.forEach((v) => { cards += `<button class="gl veh" data-veh="${v.id}" style="left:0;top:0"><span class="gl-top"><span class="gl-ico">${v.kind === 'ship' ? '⛴' : '⛟'}</span><b>${v.id}</b></span><span class="v">${v.co2} ${v.unit}</span></button>`; });
   }
-  const [cl, ct] = toPct(P(9.6, 17.4, 3.6));
+  const [cl, ct] = toPct(PA('cc', 9.6, 17.4, 3.6));
   cards += `<button class="gl cc" data-cp="cc" style="left:${cl.toFixed(2)}%;top:${ct.toFixed(2)}%;z-index:2000"><span class="gl-top"><i class="live-dot"></i><b>Command &amp; control</b></span><span class="v">Open live dashboard →</span></button>`;
   root.querySelector('.leaders').innerHTML = lines;
   root.querySelector('.ov').innerHTML = cards;
@@ -142,6 +145,50 @@ function drawPop() {
   $$('[data-goto]', el).forEach((b) => b.addEventListener('click', () => goto(b.dataset.goto)));
 }
 
+/* full screen and building history */
+function toggleFull(root) {
+  const on = !root.classList.contains('is-full');
+  $$('.map.is-full').forEach((x) => x.classList.remove('is-full'));
+  root.classList.toggle('is-full', on);
+  document.body.classList.toggle('map-open', on);
+  const b = root.querySelector('[data-full]'); b.setAttribute('aria-pressed', String(on)); b.textContent = on ? '✕ Exit full screen' : '⤢ Full screen';
+}
+function exitFull() { $$('.map.is-full').forEach((r) => toggleFull(r)); }
+addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('.map.is-full')) exitFull(); });
+state.bld = null;
+function bldChart(c) {
+  const isData = c.cat === 'data', ser = isData ? c.comp : c.monthly, W = 260, H = 70, pl = 4, pr = 4, pt = 10, pb = 16;
+  const mn = Math.min(...ser), mx = Math.max(...ser), rg = mx - mn || 1;
+  const X = (i) => pl + (i / (ser.length - 1)) * (W - pl - pr), Y = (v) => pt + (1 - (v - mn) / rg) * (H - pt - pb);
+  const line = ser.map((v, i) => `${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(' ');
+  const col = isData ? 'var(--ink)' : CATS[c.cat].color, m = state.month, gid = 'g' + c.id;
+  return `<svg viewBox="0 0 ${W} ${H}" class="bld-chart" role="img" aria-label="${isData ? 'Data completeness' : 'Monthly CO2e'}, 36 months">
+    <defs><linearGradient id="${gid}" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity=".28"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs>
+    ${[12, 24].map((k) => `<line x1="${X(k)}" x2="${X(k)}" y1="${pt - 4}" y2="${H - pb}" stroke="var(--line2)" stroke-dasharray="2 3"/>`).join('')}
+    <polygon points="${X(0)},${H - pb} ${line} ${X(ser.length - 1)},${H - pb}" fill="url(#${gid})"/>
+    <polyline class="bld-line" points="${line}" fill="none" stroke="${col}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="${X(m)}" cy="${Y(ser[m])}" r="3" fill="var(--ink)" stroke="var(--raised)" stroke-width="1.5"/>
+    ${[0, 1, 2].map((y) => `<text x="${X(y * 12) + 3}" y="${H - 4}" font-size="9" fill="var(--muted)">${Y0 + y}</text>`).join('')}
+  </svg>`;
+}
+function showBld(root, id) {
+  const layer = root.querySelector('.pop-layer'); if (!layer) return;
+  state.bld = id;
+  const c = CPI[id], a = ASSETS[id], [l, t] = toPct(PA(id, a.pin[0], a.pin[1], a.pin[2]));
+  const isData = c.cat === 'data', m = state.month, y = yearOf(m);
+  const ser = isData ? c.comp : c.monthly;
+  const yt = (yy) => sum(c.monthly.slice((yy - 1) * 12, yy * 12));
+  const ch = !isData && y > 1 ? yt(y) / yt(1) - 1 : null;
+  const right = l > 62;
+  layer.innerHTML = `<div class="bld-pop${right ? ' left' : ''}" style="left:${l.toFixed(2)}%;top:${Math.max(14, t).toFixed(2)}%" role="dialog" aria-label="CP-${id} carbon history">
+    <div class="flex between" style="flex-wrap:nowrap"><span class="eyebrow">CP-${id} · ${esc(c.scope)}</span><button class="tour-x" data-popx aria-label="Close">×</button></div>
+    <b class="pop-t">${esc(c.name.split(' (')[0])}</b>
+    <div class="flex between" style="align-items:baseline"><span class="bld-v">${isData ? pct(ser[m]) : fmtT(ser[m])}</span><span class="note">${isData ? 'complete' : 'CO₂e'} · ${monthLabel(m)}</span></div>
+    ${bldChart(c)}
+    <div class="flex between note" style="flex-wrap:nowrap"><span>${isData ? `min ${pct(Math.min(...ser))}` : `low ${fmtT(Math.min(...ser))} · high ${fmtT(Math.max(...ser))}`}</span>${ch != null ? `<b class="${ch < 0 ? 'up' : 'down'}">${sgn(ch)} vs 2027</b>` : ''}</div>
+    <button class="tag" data-popgo="${id}" style="cursor:pointer;border:0;justify-self:start">Open in Site map →</button></div>`;
+}
+
 /* vehicles */
 const RM = matchMedia('(prefers-reduced-motion: reduce)');
 let rafOn = false, lastF = 0;
@@ -173,10 +220,10 @@ function vehicleSVG(v, p) {
 function drawVehicles(t) {
   $$('.map').forEach((root) => {
     const pos = VEHICLES.map((v, i) => [v, posAt(v, t + i * 7.3)]);
-    root.querySelector('.vehs').innerHTML = pos.sort((a, b) => (a[1].x + a[1].y) - (b[1].x + b[1].y)).map(([v, p]) => vehicleSVG(v, p)).join('');
+    root.querySelector('.vehs').innerHTML = pos.sort((a, b) => (a[1].x + a[1].y) - (b[1].x + b[1].y)).map(([v, p]) => withShift([p.x * (K - 1), p.y * (K - 1)], () => vehicleSVG(v, p))).join('');
     pos.forEach(([v, p]) => {
       const el = root.querySelector(`[data-veh="${v.id}"]`); if (!el) return;
-      const s = P(p.x, p.y, v.kind === 'ship' ? 2.2 : 2), [l, tp] = toPct(s);
+      const s = PW(p.x, p.y, v.kind === 'ship' ? 2.2 : 2), [l, tp] = toPct(s);
       el.style.left = l.toFixed(2) + '%'; el.style.top = tp.toFixed(2) + '%'; el.style.zIndex = Math.round(s[1]);
     });
   });

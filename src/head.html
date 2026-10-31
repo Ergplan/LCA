@@ -394,7 +394,20 @@ input[type="range"] { width: 100%; accent-color: var(--ink); }
 /* ---------- live map: glass cards ---------- */
 .map { position: relative; }
 .map .ov { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
-.map-ctl { position: absolute; top: 6px; right: 6px; z-index: 3000; background: color-mix(in srgb, var(--raised) 70%, transparent); backdrop-filter: blur(8px); }
+.map-top { position: absolute; top: 6px; right: 6px; z-index: 3000; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.map-ctl { background: color-mix(in srgb, var(--raised) 70%, transparent); backdrop-filter: blur(8px); }
+.map-full { background: color-mix(in srgb, var(--raised) 70%, transparent); backdrop-filter: blur(8px); }
+.map-stage { position: relative; }
+.map.is-full { position: fixed; inset: 0; z-index: 6000; background: var(--page); display: flex; flex-direction: column; justify-content: center; padding: 56px 16px 16px; overflow: auto; }
+.map.is-full .map-top { position: fixed; top: 12px; right: 16px; }
+.map.is-full .map-stage { width: min(100%, calc((100vh - 76px) * 1340 / 850)); margin: 0 auto; }
+body.map-open { overflow: hidden; }
+.pop-layer { position: absolute; inset: 0; pointer-events: none; z-index: 2600; }
+.bld-pop { position: absolute; pointer-events: auto; transform: translate(18px, -50%); width: 290px; display: grid; gap: 4px; padding: 12px 14px; border-radius: 16px;
+  background: color-mix(in srgb, var(--raised) 72%, transparent); -webkit-backdrop-filter: blur(14px) saturate(1.4); backdrop-filter: blur(14px) saturate(1.4); border: 1px solid color-mix(in srgb, var(--raised) 70%, transparent); box-shadow: 0 18px 50px -14px rgba(0,0,0,.4), inset 0 0 0 .5px color-mix(in srgb, var(--ink) 16%, transparent); }
+.bld-pop.left { transform: translate(calc(-100% - 18px), -50%); }
+.bld-v { font-size: 22px; font-weight: 600; letter-spacing: -.02em; }
+.bld-chart { width: 100%; height: auto; display: block; margin: 2px 0; }
 .gl { all: unset; pointer-events: auto; cursor: pointer; position: absolute; transform: translate(-50%, calc(-100% - 2px)); display: grid; gap: 2px; padding: 5px 8px 6px; border-radius: 11px; font: 500 10.5px/1.25 var(--font); color: var(--ink); white-space: nowrap;
   background: color-mix(in srgb, var(--raised) 52%, transparent); -webkit-backdrop-filter: blur(9px) saturate(1.5); backdrop-filter: blur(9px) saturate(1.5);
   border: 1px solid color-mix(in srgb, var(--raised) 70%, transparent); box-shadow: 0 6px 18px -8px rgba(0,0,0,.35), inset 0 0 0 .5px color-mix(in srgb, var(--ink) 18%, transparent); transition: background .15s, transform .15s; }
@@ -415,6 +428,7 @@ input[type="range"] { width: 100%; accent-color: var(--ink); }
 .gl.sel .gl-bar { background: color-mix(in srgb, var(--page) 25%, transparent); }
 .gl.dim { opacity: .3; }
 .gl[hidden], .map-ctl[hidden] { display: none; }
+@media (max-width: 640px) { .bld-pop, .bld-pop.left { width: 220px; transform: translate(-50%, 12px); left: 50% !important; } .map-top { position: static; margin-bottom: 6px; justify-content: flex-start; } }
 .gl.stock { border-style: dashed; border-color: color-mix(in srgb, var(--ink) 30%, transparent); }
 .gl.veh { padding: 3px 7px 4px; transform: translate(-50%, calc(-100% - 2px)); background: color-mix(in srgb, var(--raised) 45%, transparent); }
 .gl.cc { background: color-mix(in srgb, var(--up) 22%, color-mix(in srgb, var(--raised) 55%, transparent)); border-color: color-mix(in srgb, var(--up) 45%, transparent); }
@@ -429,6 +443,9 @@ input[type="range"] { width: 100%; accent-color: var(--ink); }
 .gl.pipe { padding: 3px 7px 4px; border-left: 3px solid var(--pc); background: color-mix(in srgb, var(--raised) 45%, transparent); }
 .pipe-sw { width: 10px; height: 3px; border-radius: 2px; background: var(--pc); display: inline-block; }
 .map.compact .gl.pipe .v { display: none; }
+/* flows and vehicles show their name only; rate and carbon on hover or focus */
+.gl.pipe .v, .gl.veh .v { display: none; }
+.gl.pipe:hover .v, .gl.pipe:focus-visible .v, .gl.veh:hover .v, .gl.veh:focus-visible .v { display: block; }
 .map.compact .gl { font-size: 9.5px; padding: 3px 6px; }
 .map.compact .gl-top b { font-size: 10px; }
 .map-pop { position: absolute; left: 10px; bottom: 10px; width: 270px; z-index: 3000; display: grid; gap: 3px; padding: 12px 14px; border-radius: 16px;

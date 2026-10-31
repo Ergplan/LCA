@@ -148,7 +148,7 @@ sec({ id: 'dashboard', group: 'Overview', icon: '◧', title: 'Dashboard', nav: 
   </div>
   <div class="panel map-panel">
     <div class="ph"><h3>Live site · ${monthLabel(m)}</h3><div class="flex"><div class="legend">${CAT_ORDER.map((k) => `<span><i class="dot" style="background:${CATS[k].color}"></i>${CATS[k].short}</span>`).join('')}</div><button class="pill" data-goto="control">Control centre →</button><button class="pill" data-goto="site">Site map →</button></div></div>
-    <div style="position:relative">${mapHTML('dashMap')}<div class="map-pop"></div></div>
+    ${mapHTML('dashMap')}
     <p class="note" style="margin-top:6px">Glass labels show this month’s CO₂e for each collection point, embodied carbon in stock and per-trip emissions of vehicles on site. Click any label.</p>
   </div>
   <div class="grid g-dash">
